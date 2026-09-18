@@ -1,0 +1,41 @@
+from enum import Enum
+
+
+class RiskResponseActionFieldItem(str, Enum):
+    ACTIVITYID = "ActivityId"
+    ACTIVITYNAME = "ActivityName"
+    ACTIVITYOBJECTID = "ActivityObjectId"
+    ACTUALCOST = "ActualCost"
+    CREATEDATE = "CreateDate"
+    CREATEUSER = "CreateUser"
+    FINISHDATE = "FinishDate"
+    ID = "Id"
+    ISBASELINE = "IsBaseline"
+    ISTEMPLATE = "IsTemplate"
+    LASTUPDATEDATE = "LastUpdateDate"
+    LASTUPDATEUSER = "LastUpdateUser"
+    NAME = "Name"
+    OBJECTID = "ObjectId"
+    PLANNEDCOST = "PlannedCost"
+    PLANNEDFINISHDATE = "PlannedFinishDate"
+    PLANNEDSTARTDATE = "PlannedStartDate"
+    PROJECTID = "ProjectId"
+    PROJECTNAME = "ProjectName"
+    PROJECTOBJECTID = "ProjectObjectId"
+    REMAININGCOST = "RemainingCost"
+    RESOURCEID = "ResourceId"
+    RESOURCENAME = "ResourceName"
+    RESOURCEOBJECTID = "ResourceObjectId"
+    RISKID = "RiskId"
+    RISKOBJECTID = "RiskObjectId"
+    RISKRESPONSEPLANID = "RiskResponsePlanId"
+    RISKRESPONSEPLANNAME = "RiskResponsePlanName"
+    RISKRESPONSEPLANOBJECTID = "RiskResponsePlanObjectId"
+    SCORE = "Score"
+    SCORECOLOR = "ScoreColor"
+    SCORETEXT = "ScoreText"
+    STARTDATE = "StartDate"
+    STATUS = "Status"
+
+    def __str__(self) -> str:
+        return str(self.value)

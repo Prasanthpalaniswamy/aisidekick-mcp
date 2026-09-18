@@ -1,0 +1,42 @@
+from enum import Enum
+
+
+class ProjectIssueFieldItem(str, Enum):
+    ACTIVITYID = "ActivityId"
+    ACTIVITYNAME = "ActivityName"
+    ACTIVITYOBJECTID = "ActivityObjectId"
+    ACTUALVALUE = "ActualValue"
+    CREATEDATE = "CreateDate"
+    CREATEUSER = "CreateUser"
+    DATEIDENTIFIED = "DateIdentified"
+    IDENTIFIEDBY = "IdentifiedBy"
+    ISBASELINE = "IsBaseline"
+    ISTEMPLATE = "IsTemplate"
+    LASTUPDATEDATE = "LastUpdateDate"
+    LASTUPDATEUSER = "LastUpdateUser"
+    LOWERTHRESHOLD = "LowerThreshold"
+    NAME = "Name"
+    NOTES = "Notes"
+    OBJECTID = "ObjectId"
+    OBSNAME = "OBSName"
+    OBSOBJECTID = "OBSObjectId"
+    PARENTWBSOBJECTID = "ParentWBSObjectId"
+    PRIORITY = "Priority"
+    PROJECTID = "ProjectId"
+    PROJECTNAME = "ProjectName"
+    PROJECTOBJECTID = "ProjectObjectId"
+    PROJECTTHRESHOLDOBJECTID = "ProjectThresholdObjectId"
+    RAWTEXTNOTE = "RawTextNote"
+    RESOLUTIONDATE = "ResolutionDate"
+    RESOURCEID = "ResourceId"
+    RESOURCENAME = "ResourceName"
+    RESOURCEOBJECTID = "ResourceObjectId"
+    STATUS = "Status"
+    THRESHOLDPARAMETEROBJECTID = "ThresholdParameterObjectId"
+    UPPERTHRESHOLD = "UpperThreshold"
+    WBSCODE = "WBSCode"
+    WBSNAME = "WBSName"
+    WBSOBJECTID = "WBSObjectId"
+
+    def __str__(self) -> str:
+        return str(self.value)

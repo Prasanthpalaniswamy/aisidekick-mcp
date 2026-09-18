@@ -1,0 +1,218 @@
+from http import HTTPStatus
+from typing import Any, cast
+
+import httpx
+
+from ... import errors
+from ...client import AuthenticatedClient, Client
+from ...models.async_asap_import_project import AsyncASAPImportProject
+from ...models.import_project_async_asap_response import ImportProjectAsyncASAPResponse
+from ...types import UNSET, Response, Unset
+
+
+def _get_kwargs(
+    *,
+    body: AsyncASAPImportProject | Unset = UNSET,
+    auth_token: str | Unset = UNSET,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+    if not isinstance(auth_token, Unset):
+        headers["AuthToken"] = auth_token
+
+    _kwargs: dict[str, Any] = {
+        "method": "post",
+        "url": "/import/importProjectAsyncASAP",
+    }
+
+    if not isinstance(body, Unset):
+        _kwargs["files"] = body.to_multipart()
+
+    _kwargs["headers"] = headers
+    return _kwargs
+
+
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Any | ImportProjectAsyncASAPResponse | None:
+    if response.status_code == 201:
+        response_201 = ImportProjectAsyncASAPResponse.from_dict(response.json())
+
+        return response_201
+
+    if response.status_code == 400:
+        response_400 = cast(Any, None)
+        return response_400
+
+    if response.status_code == 401:
+        response_401 = cast(Any, None)
+        return response_401
+
+    if response.status_code == 403:
+        response_403 = cast(Any, None)
+        return response_403
+
+    if response.status_code == 404:
+        response_404 = cast(Any, None)
+        return response_404
+
+    if response.status_code == 405:
+        response_405 = cast(Any, None)
+        return response_405
+
+    if response.status_code == 500:
+        response_500 = cast(Any, None)
+        return response_500
+
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
+
+
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[Any | ImportProjectAsyncASAPResponse]:
+    return Response(
+        status_code=HTTPStatus(response.status_code),
+        content=response.content,
+        headers=response.headers,
+        parsed=_parse_response(client=client, response=response),
+    )
+
+
+def sync_detailed(
+    *,
+    client: AuthenticatedClient | Client,
+    body: AsyncASAPImportProject | Unset = UNSET,
+    auth_token: str | Unset = UNSET,
+) -> Response[Any | ImportProjectAsyncASAPResponse]:
+    """ImportProjectAsyncASAP
+
+     Imports one or more new projects from an XML file asynchronously as a job. Each new project is
+    created under the EPS specified by the EPSObjectId. When you call the ImportProjects operation, you
+    specify one or more ImportProject elements. Each of these elements contain information about the
+    project you are importing.
+
+    Args:
+        auth_token (str | Unset):
+        body (AsyncASAPImportProject | Unset): AsyncASAPImportProject Entity
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[Any | ImportProjectAsyncASAPResponse]
+    """
+
+    kwargs = _get_kwargs(
+        body=body,
+        auth_token=auth_token,
+    )
+
+    response = client.get_httpx_client().request(
+        **kwargs,
+    )
+
+    return _build_response(client=client, response=response)
+
+
+def sync(
+    *,
+    client: AuthenticatedClient | Client,
+    body: AsyncASAPImportProject | Unset = UNSET,
+    auth_token: str | Unset = UNSET,
+) -> Any | ImportProjectAsyncASAPResponse | None:
+    """ImportProjectAsyncASAP
+
+     Imports one or more new projects from an XML file asynchronously as a job. Each new project is
+    created under the EPS specified by the EPSObjectId. When you call the ImportProjects operation, you
+    specify one or more ImportProject elements. Each of these elements contain information about the
+    project you are importing.
+
+    Args:
+        auth_token (str | Unset):
+        body (AsyncASAPImportProject | Unset): AsyncASAPImportProject Entity
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Any | ImportProjectAsyncASAPResponse
+    """
+
+    return sync_detailed(
+        client=client,
+        body=body,
+        auth_token=auth_token,
+    ).parsed
+
+
+async def asyncio_detailed(
+    *,
+    client: AuthenticatedClient | Client,
+    body: AsyncASAPImportProject | Unset = UNSET,
+    auth_token: str | Unset = UNSET,
+) -> Response[Any | ImportProjectAsyncASAPResponse]:
+    """ImportProjectAsyncASAP
+
+     Imports one or more new projects from an XML file asynchronously as a job. Each new project is
+    created under the EPS specified by the EPSObjectId. When you call the ImportProjects operation, you
+    specify one or more ImportProject elements. Each of these elements contain information about the
+    project you are importing.
+
+    Args:
+        auth_token (str | Unset):
+        body (AsyncASAPImportProject | Unset): AsyncASAPImportProject Entity
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[Any | ImportProjectAsyncASAPResponse]
+    """
+
+    kwargs = _get_kwargs(
+        body=body,
+        auth_token=auth_token,
+    )
+
+    response = await client.get_async_httpx_client().request(**kwargs)
+
+    return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    *,
+    client: AuthenticatedClient | Client,
+    body: AsyncASAPImportProject | Unset = UNSET,
+    auth_token: str | Unset = UNSET,
+) -> Any | ImportProjectAsyncASAPResponse | None:
+    """ImportProjectAsyncASAP
+
+     Imports one or more new projects from an XML file asynchronously as a job. Each new project is
+    created under the EPS specified by the EPSObjectId. When you call the ImportProjects operation, you
+    specify one or more ImportProject elements. Each of these elements contain information about the
+    project you are importing.
+
+    Args:
+        auth_token (str | Unset):
+        body (AsyncASAPImportProject | Unset): AsyncASAPImportProject Entity
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Any | ImportProjectAsyncASAPResponse
+    """
+
+    return (
+        await asyncio_detailed(
+            client=client,
+            body=body,
+            auth_token=auth_token,
+        )
+    ).parsed

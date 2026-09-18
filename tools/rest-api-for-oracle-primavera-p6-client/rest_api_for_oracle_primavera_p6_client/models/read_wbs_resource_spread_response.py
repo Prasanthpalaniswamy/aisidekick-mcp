@@ -1,0 +1,143 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar
+
+from attrs import define as _attrs_define
+from attrs import field as _attrs_field
+
+from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.resource_role_spread_period import ResourceRoleSpreadPeriod
+
+
+T = TypeVar("T", bound="ReadWBSResourceSpreadResponse")
+
+
+@_attrs_define
+class ReadWBSResourceSpreadResponse:
+    """ReadWBSResourceSpreadResponse Entity
+
+    Attributes:
+        wbs_code (str | Unset):
+        wbs_object_id (int | Unset):
+        resource_id (str | Unset):
+        resource_object_id (int | Unset):
+        start_date (str | Unset):
+        end_date (str | Unset):
+        period_type (str | Unset):
+        period (list[ResourceRoleSpreadPeriod] | Unset):
+    """
+
+    wbs_code: str | Unset = UNSET
+    wbs_object_id: int | Unset = UNSET
+    resource_id: str | Unset = UNSET
+    resource_object_id: int | Unset = UNSET
+    start_date: str | Unset = UNSET
+    end_date: str | Unset = UNSET
+    period_type: str | Unset = UNSET
+    period: list[ResourceRoleSpreadPeriod] | Unset = UNSET
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        wbs_code = self.wbs_code
+
+        wbs_object_id = self.wbs_object_id
+
+        resource_id = self.resource_id
+
+        resource_object_id = self.resource_object_id
+
+        start_date = self.start_date
+
+        end_date = self.end_date
+
+        period_type = self.period_type
+
+        period: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.period, Unset):
+            period = []
+            for period_item_data in self.period:
+                period_item = period_item_data.to_dict()
+                period.append(period_item)
+
+        field_dict: dict[str, Any] = {}
+        field_dict.update(self.additional_properties)
+        field_dict.update({})
+        if wbs_code is not UNSET:
+            field_dict["WBSCode"] = wbs_code
+        if wbs_object_id is not UNSET:
+            field_dict["WBSObjectId"] = wbs_object_id
+        if resource_id is not UNSET:
+            field_dict["ResourceId"] = resource_id
+        if resource_object_id is not UNSET:
+            field_dict["ResourceObjectId"] = resource_object_id
+        if start_date is not UNSET:
+            field_dict["StartDate"] = start_date
+        if end_date is not UNSET:
+            field_dict["EndDate"] = end_date
+        if period_type is not UNSET:
+            field_dict["PeriodType"] = period_type
+        if period is not UNSET:
+            field_dict["Period"] = period
+
+        return field_dict
+
+    @classmethod
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.resource_role_spread_period import ResourceRoleSpreadPeriod
+
+        d = dict(src_dict)
+        wbs_code = d.pop("WBSCode", UNSET)
+
+        wbs_object_id = d.pop("WBSObjectId", UNSET)
+
+        resource_id = d.pop("ResourceId", UNSET)
+
+        resource_object_id = d.pop("ResourceObjectId", UNSET)
+
+        start_date = d.pop("StartDate", UNSET)
+
+        end_date = d.pop("EndDate", UNSET)
+
+        period_type = d.pop("PeriodType", UNSET)
+
+        _period = d.pop("Period", UNSET)
+        period: list[ResourceRoleSpreadPeriod] | Unset = UNSET
+        if _period is not UNSET:
+            period = []
+            for period_item_data in _period:
+                period_item = ResourceRoleSpreadPeriod.from_dict(period_item_data)
+
+                period.append(period_item)
+
+        read_wbs_resource_spread_response = cls(
+            wbs_code=wbs_code,
+            wbs_object_id=wbs_object_id,
+            resource_id=resource_id,
+            resource_object_id=resource_object_id,
+            start_date=start_date,
+            end_date=end_date,
+            period_type=period_type,
+            period=period,
+        )
+
+        read_wbs_resource_spread_response.additional_properties = d
+        return read_wbs_resource_spread_response
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

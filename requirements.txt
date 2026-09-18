@@ -1,0 +1,10 @@
+mcp==1.26.0
+httpx==0.28.1
+attrs>=22.2.0
+python-dateutil==2.9.0.post0
+python-dotenv==1.2.2
+uvicorn==0.41.0
+pandas==3.0.2
+requests==2.33.1
+python-docx==1.1.2
+matplotlib==3.10.3
