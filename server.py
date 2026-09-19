@@ -83,7 +83,10 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         request,
         call_next
     ):
-
+        # Allow MCP authorization/discovery metadata requests
+        # without API-key authentication.
+        if request.url.path.startswith("/.well-known/"):
+            return await call_next(request)
         api_key = request.headers.get(
             "X-API-Key"
         )

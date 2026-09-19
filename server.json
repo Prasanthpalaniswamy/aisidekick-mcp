@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Prasanthpalaniswamy/aisidekick-mcp",
+  "title": "AISidekick",
+  "description": "AI-powered project controls tools for Primavera P6 and Primavera Unifier.",
+  "repository": {
+    "url": "https://github.com/Prasanthpalaniswamy/aisidekick-mcp",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "websiteUrl": "https://aisidekick.onrender.com/",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://aisidekick-mcp.onrender.com/mcp",
+      "headers": [
+        {
+          "name": "X-API-Key",
+          "description": "AISidekick API key. Get your API key from the AISidekick dashboard.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

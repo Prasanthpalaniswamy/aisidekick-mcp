@@ -48,4 +48,5 @@ def validate_product_access(
     raise SubscriptionError(
         "No active subscription for any supported product"
     )
+
 # End of code
