@@ -1,5 +1,9 @@
 from services.django_client import validate_key
 from venv import logger
+from request_context import (
+    current_api_key,
+    current_user
+)
 
 class AuthenticationError(
     Exception

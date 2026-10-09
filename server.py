@@ -216,12 +216,9 @@ from prompts.unifier.prompt_registry import (
 #     return decorator
 register_p6_tools(mcp)
 register_p6_resources(mcp)
-
 register_unifier_tools(mcp)
 register_unifier_resources(mcp)
-
 register_unifier_prompts(mcp)
-
 register_support_tools(mcp)
 register_visualization_tools(mcp)
 

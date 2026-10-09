@@ -423,48 +423,6 @@ def _get_p6_resource_assignments(
         }
 
 
-# def _get_p6_user_obs(
-#     auth_token: str,
-#     cookies: requests.cookies.RequestsCookieJar,
-#     base_url: str,
-#     fields: str,
-#     filter_condition: str,
-#     order_by: str,
-# ) -> dict[str, Any]:
-#     url = f"{base_url.rstrip('/')}/userOBS"
-#     headers = _create_headers(auth_token)
-
-#     try:
-#         response = requests.get(
-#             url,
-#             headers=headers,
-#             cookies=cookies,
-#             params={
-#                 "Fields": fields,
-#                 "Filter": filter_condition,
-#                 "OrderBy": order_by,
-#             },
-#             timeout=REQUEST_TIMEOUT_SECONDS,
-#         )
-#         response.raise_for_status()
-#         user_obs = response.json()
-#         return {
-#             "success": True,
-#             "count": len(user_obs) if isinstance(user_obs, list) else None,
-#             "user_obs": user_obs,
-#         }
-#     except requests.RequestException as exc:
-#         logger.error("Failed to fetch UserOBS: %s", exc)
-#         return {
-#             "success": False,
-#             "error": f"Failed to fetch UserOBS: {exc}",
-#         }
-#     except ValueError:
-#         return {
-#             "success": False,
-#             "error": "P6 UserOBS response was not valid JSON.",
-#         }
-
 def _get_p6_user_obs(
     auth_token: str,
     cookies: requests.cookies.RequestsCookieJar,
@@ -473,7 +431,6 @@ def _get_p6_user_obs(
     filter_condition: str,
     order_by: str,
 ) -> dict[str, Any]:
-
     url = f"{base_url.rstrip('/')}/userOBS"
     headers = _create_headers(auth_token)
 
@@ -489,41 +446,26 @@ def _get_p6_user_obs(
             },
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
-
-        if not response.ok:
-            logger.error(
-                "P6 UserOBS request failed. "
-                "status=%s url=%s response=%s",
-                response.status_code,
-                response.url,
-                response.text[:2000],
-            )
-
         response.raise_for_status()
-
         user_obs = response.json()
-
         return {
             "success": True,
             "count": len(user_obs) if isinstance(user_obs, list) else None,
             "user_obs": user_obs,
         }
-
     except requests.RequestException as exc:
         logger.error("Failed to fetch UserOBS: %s", exc)
-
         return {
             "success": False,
             "error": f"Failed to fetch UserOBS: {exc}",
         }
-
     except ValueError:
         return {
             "success": False,
             "error": "P6 UserOBS response was not valid JSON.",
         }
 
-    
+
 def _get_p6_calendars(
     auth_token: str,
     cookies: requests.cookies.RequestsCookieJar,
@@ -1520,7 +1462,7 @@ def register_p6_tools(mcp: FastMCP) -> None:
         file_type: str = "XML",
         encoding: str = "UTF-8",
         line_separator: str = "",
-        spread_period_type: str = "Day",
+        spread_period_type: str = "DAY",
         spacing: str = "  ",
     ) -> dict[str, Any]:
         """Export a P6 project using POST /export/exportProject."""
@@ -1561,7 +1503,7 @@ def register_p6_tools(mcp: FastMCP) -> None:
         file_type: str = "XML",
         encoding: str = "UTF-8",
         line_separator: str = "",
-        spread_period_type: str = "Day",
+        spread_period_type: str = "DAY",
         spacing: str = "  ",
     ) -> dict[str, Any]:
         """Export one or more P6 projects using POST /export/exportProjects.

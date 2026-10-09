@@ -7,12 +7,7 @@ from pathlib import Path
 from typing import Any
 import requests
 from mcp.server.fastmcp import Context, FastMCP
-from tools.session_store import (
-    P6_SESSIONS,
-    get_session_key,
-    clear_p6_session as clear_p6_connection_session,
-)
-from tools.p6_connection_manager import get_p6_connection_session
+from tools.session_store import P6_SESSIONS, get_session_key
 from tools.tool_registry import (
     register_tracked_tool
 )
@@ -20,7 +15,7 @@ from request_context import (
     current_api_key,
     current_user
 )
-
+from tools.p6_connection_manager import get_p6_connection_session
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT_SECONDS = 30
@@ -423,48 +418,6 @@ def _get_p6_resource_assignments(
         }
 
 
-# def _get_p6_user_obs(
-#     auth_token: str,
-#     cookies: requests.cookies.RequestsCookieJar,
-#     base_url: str,
-#     fields: str,
-#     filter_condition: str,
-#     order_by: str,
-# ) -> dict[str, Any]:
-#     url = f"{base_url.rstrip('/')}/userOBS"
-#     headers = _create_headers(auth_token)
-
-#     try:
-#         response = requests.get(
-#             url,
-#             headers=headers,
-#             cookies=cookies,
-#             params={
-#                 "Fields": fields,
-#                 "Filter": filter_condition,
-#                 "OrderBy": order_by,
-#             },
-#             timeout=REQUEST_TIMEOUT_SECONDS,
-#         )
-#         response.raise_for_status()
-#         user_obs = response.json()
-#         return {
-#             "success": True,
-#             "count": len(user_obs) if isinstance(user_obs, list) else None,
-#             "user_obs": user_obs,
-#         }
-#     except requests.RequestException as exc:
-#         logger.error("Failed to fetch UserOBS: %s", exc)
-#         return {
-#             "success": False,
-#             "error": f"Failed to fetch UserOBS: {exc}",
-#         }
-#     except ValueError:
-#         return {
-#             "success": False,
-#             "error": "P6 UserOBS response was not valid JSON.",
-#         }
-
 def _get_p6_user_obs(
     auth_token: str,
     cookies: requests.cookies.RequestsCookieJar,
@@ -473,7 +426,6 @@ def _get_p6_user_obs(
     filter_condition: str,
     order_by: str,
 ) -> dict[str, Any]:
-
     url = f"{base_url.rstrip('/')}/userOBS"
     headers = _create_headers(auth_token)
 
@@ -489,41 +441,26 @@ def _get_p6_user_obs(
             },
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
-
-        if not response.ok:
-            logger.error(
-                "P6 UserOBS request failed. "
-                "status=%s url=%s response=%s",
-                response.status_code,
-                response.url,
-                response.text[:2000],
-            )
-
         response.raise_for_status()
-
         user_obs = response.json()
-
         return {
             "success": True,
             "count": len(user_obs) if isinstance(user_obs, list) else None,
             "user_obs": user_obs,
         }
-
     except requests.RequestException as exc:
         logger.error("Failed to fetch UserOBS: %s", exc)
-
         return {
             "success": False,
             "error": f"Failed to fetch UserOBS: {exc}",
         }
-
     except ValueError:
         return {
             "success": False,
             "error": "P6 UserOBS response was not valid JSON.",
         }
 
-    
+
 def _get_p6_calendars(
     auth_token: str,
     cookies: requests.cookies.RequestsCookieJar,
@@ -1356,42 +1293,105 @@ def register_p6_tools(mcp: FastMCP) -> None:
     @register_tracked_tool(
         mcp
     )
-    def clear_p6_session(
+    def clear_p6_session(ctx: Context) -> dict[str, Any]:
+        """Clear stored P6 credentials for the current client session."""
+        session_key = get_session_key(ctx)
+        if session_key in P6_SESSIONS:
+            del P6_SESSIONS[session_key]
+            return {"success": True, "message": "P6 session cleared."}
+        return {"success": True, "message": "No active P6 session found."}
+
+    # @register_tracked_tool(
+    #     mcp
+    # )
+    # def get_project_from_p6(ctx: Context, project_filter: str = "") -> dict[str, Any]:
+    #     """Get project details from Oracle Primavera P6. Leave project_filter empty to list all projects."""
+    #     creds, missing = _resolve_credentials(ctx)
+    #     if missing:
+    #         return {
+    #             "success": False,
+    #             "requires_credentials": True,
+    #             "missing": missing,
+    #             "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+    #         }
+
+    #     auth_token = _generate_auth_token(creds["username"], creds["password"])
+    #     cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
+
+    #     if not cookies:
+    #         return {
+    #             "success": False,
+    #             "error": "P6 login failed.",
+    #         }
+
+    #     return _get_p6_projects(auth_token, cookies, creds["base_url"], project_filter or None)
+    @register_tracked_tool(mcp)
+    def get_project_from_p6(
         ctx: Context,
         connection_id: int,
+        project_filter: str = "",
     ) -> dict[str, Any]:
-        """Clear the cached P6 session for one saved P6 connection."""
-        cleared = clear_p6_connection_session(ctx, connection_id)
-        return {
-            "success": True,
-            "connection_id": connection_id,
-            "message": (
-                "P6 connection session cleared."
-                if cleared
-                else "No cached P6 session found for this connection."
-            ),
-        }
+        """Get project details from Oracle Primavera P6.
 
-    @register_tracked_tool(
-        mcp
-    )
-    def get_project_from_p6(ctx: Context,
-        connection_id: int, project_filter: str = "") -> dict[str, Any]:
-        """Get project details from Oracle Primavera P6. Leave project_filter empty to list all projects."""
-        
-        result = get_p6_connection_session(ctx, connection_id)
+        connection_id identifies which saved P6 connection to use.
+        Leave project_filter empty to list all projects.
+        """
+
+        result = get_p6_connection_session(
+            ctx,
+            connection_id,
+        )
+
         if not result["success"]:
             return result
 
         session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
 
-        return _get_p6_projects(auth_token, cookies, base_url, project_filter or None)
+        return _get_p6_projects(
+            auth_token=session["auth_token"],
+            cookies=session["cookies"],
+            base_url=session["base_url"],
+            project_filter=project_filter or None,
+        )
 
+    # @register_tracked_tool(
+    #     mcp
+    # )
+    # def get_activities_from_p6(
+    #     ctx: Context,
+    #     fields: str,
+    #     filter_condition: str,
+    #     order_by: str,
+    # ) -> dict[str, Any]:
+    #     """Read activities from Oracle Primavera P6 using required Fields, Filter, and OrderBy query parameters."""
+    #     creds, missing = _resolve_credentials(ctx)
+    #     if missing:
+    #         return {
+    #             "success": False,
+    #             "requires_credentials": True,
+    #             "missing": missing,
+    #             "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+    #         }
+
+    #     auth_token = _generate_auth_token(creds["username"], creds["password"])
+    #     cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
+
+    #     if not cookies:
+    #         return {
+    #             "success": False,
+    #             "error": "P6 login failed.",
+    #         }
+
+    #     return _get_p6_activities(
+    #         auth_token=auth_token,
+    #         cookies=cookies,
+    #         base_url=creds["base_url"],
+    #         fields=fields,
+    #         filter_condition=filter_condition,
+    #         order_by=order_by,
+    #     )
     @register_tracked_tool(
-        mcp
+    mcp
     )
     def get_activities_from_p6(
         ctx: Context,
@@ -1400,25 +1400,63 @@ def register_p6_tools(mcp: FastMCP) -> None:
         filter_condition: str,
         order_by: str,
     ) -> dict[str, Any]:
-        """Read activities from Oracle Primavera P6 using required Fields, Filter, and OrderBy query parameters."""
-        
+        """Read activities from Oracle Primavera P6.
+
+        connection_id identifies which saved P6 connection to use.
+        Fields, Filter, and OrderBy are passed to the P6 REST API.
+        """
         result = get_p6_connection_session(ctx, connection_id)
+
         if not result["success"]:
             return result
 
         session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
 
         return _get_p6_activities(
-            auth_token=auth_token,
-            cookies=cookies,
-            base_url=base_url,
+            auth_token=session["auth_token"],
+            cookies=session["cookies"],
+            base_url=session["base_url"],
             fields=fields,
             filter_condition=filter_condition,
             order_by=order_by,
         )
+
+    # @register_tracked_tool(
+    #     mcp
+    # )
+    # def get_eps_from_p6(
+    #     ctx: Context,
+    #     fields: str,
+    #     filter_condition: str,
+    #     order_by: str,
+    # ) -> dict[str, Any]:
+    #     """Read EPS from Oracle Primavera P6 using required Fields, Filter, and OrderBy query parameters."""
+    #     creds, missing = _resolve_credentials(ctx)
+    #     if missing:
+    #         return {
+    #             "success": False,
+    #             "requires_credentials": True,
+    #             "missing": missing,
+    #             "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+    #         }
+
+    #     auth_token = _generate_auth_token(creds["username"], creds["password"])
+    #     cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
+
+    #     if not cookies:
+    #         return {
+    #             "success": False,
+    #             "error": "P6 login failed.",
+    #         }
+
+    #     return _get_p6_eps(
+    #         auth_token=auth_token,
+    #         cookies=cookies,
+    #         base_url=creds["base_url"],
+    #         fields=fields,
+    #         filter_condition=filter_condition,
+    #         order_by=order_by,
+    #     )
 
     @register_tracked_tool(
         mcp
@@ -1430,51 +1468,58 @@ def register_p6_tools(mcp: FastMCP) -> None:
         filter_condition: str,
         order_by: str,
     ) -> dict[str, Any]:
-        """Read EPS from Oracle Primavera P6 using required Fields, Filter, and OrderBy query parameters."""
-        
+        """Read EPS from Oracle Primavera P6.
+
+        connection_id identifies which saved P6 connection to use.
+        Fields, Filter, and OrderBy are passed to the P6 REST API.
+        """
         result = get_p6_connection_session(ctx, connection_id)
+
         if not result["success"]:
             return result
 
         session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
 
         return _get_p6_eps(
-            auth_token=auth_token,
-            cookies=cookies,
-            base_url=base_url,
+            auth_token=session["auth_token"],
+            cookies=session["cookies"],
+            base_url=session["base_url"],
             fields=fields,
             filter_condition=filter_condition,
             order_by=order_by,
         )
-
     @register_tracked_tool(
         mcp
     )
     def get_resources_from_p6(
         ctx: Context,
-        connection_id: int,
         fields: str,
         filter_condition: str,
         order_by: str,
     ) -> dict[str, Any]:
         """Read resources from Oracle Primavera P6 using required Fields, Filter, and OrderBy query parameters."""
-        
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
+
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _get_p6_resources(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             fields=fields,
             filter_condition=filter_condition,
             order_by=order_by,
@@ -1485,26 +1530,33 @@ def register_p6_tools(mcp: FastMCP) -> None:
     )
     def get_resource_assignments_from_p6(
         ctx: Context,
-        connection_id: int,
         fields: str,
         filter_condition: str,
         order_by: str,
     ) -> dict[str, Any]:
         """Read resource assignments from Oracle Primavera P6 using required Fields, Filter, and OrderBy query parameters."""
-        
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
+
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _get_p6_resource_assignments(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             fields=fields,
             filter_condition=filter_condition,
             order_by=order_by,
@@ -1515,24 +1567,31 @@ def register_p6_tools(mcp: FastMCP) -> None:
     )
     def export_project_from_p6(
         ctx: Context,
-        connection_id: int,
         project_object_id: int,
         file_type: str = "XML",
         encoding: str = "UTF-8",
         line_separator: str = "",
-        spread_period_type: str = "Day",
+        spread_period_type: str = "DAY",
         spacing: str = "  ",
     ) -> dict[str, Any]:
         """Export a P6 project using POST /export/exportProject."""
-        
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
+
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         payload: dict[str, Any] = {
             "ProjectObjectId": project_object_id,
@@ -1547,7 +1606,7 @@ def register_p6_tools(mcp: FastMCP) -> None:
         return _export_p6_project(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             payload=payload,
         )
 
@@ -1556,19 +1615,26 @@ def register_p6_tools(mcp: FastMCP) -> None:
     )
     def export_projects_from_p6(
         ctx: Context,
-        connection_id: int,
         project_object_ids: str,
         file_type: str = "XML",
         encoding: str = "UTF-8",
         line_separator: str = "",
-        spread_period_type: str = "Day",
+        spread_period_type: str = "DAY",
         spacing: str = "  ",
     ) -> dict[str, Any]:
         """Export one or more P6 projects using POST /export/exportProjects.
 
         project_object_ids: comma-separated list of ProjectObjectId values, e.g. "388,389".
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         parsed_ids: list[int] = []
         try:
             parsed_ids = [int(item.strip()) for item in project_object_ids.split(",") if item.strip()]
@@ -1584,14 +1650,14 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "At least one project_object_id is required.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         payload: dict[str, Any] = {
             "ProjectObjectId": parsed_ids,
@@ -1606,21 +1672,28 @@ def register_p6_tools(mcp: FastMCP) -> None:
         return _export_p6_projects(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             payload=payload,
         )
 
     @register_tracked_tool(
         mcp
     )
-    def create_eps_in_p6(ctx: Context,
-        connection_id: int, eps_items_json: str) -> dict[str, Any]:
+    def create_eps_in_p6(ctx: Context, eps_items_json: str) -> dict[str, Any]:
         """Create one or more EPS records in P6 using POST /eps.
 
         Pass a JSON array string of EPS objects as `eps_items_json`.
         Example: '[{"Id":"EPS-1001","Name":"My EPS"}]'
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(eps_items_json)
         except json.JSONDecodeError as exc:
@@ -1645,33 +1718,40 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "Each item in eps_items_json must be a JSON object.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_eps(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             eps_list_payload=parsed_payload,
         )
 
     @register_tracked_tool(
         mcp
     )
-    def create_resources_in_p6(ctx: Context,
-        connection_id: int, resource_items_json: str) -> dict[str, Any]:
+    def create_resources_in_p6(ctx: Context, resource_items_json: str) -> dict[str, Any]:
         """Create one or more resources in P6 using POST /resource.
 
         Pass a JSON array string of Resource objects as `resource_items_json`.
         Example: '[{"Id":"RSC-1001","Name":"Sample Resource","ResourceType":"Labor"}]'
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(resource_items_json)
         except json.JSONDecodeError as exc:
@@ -1696,19 +1776,19 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "Each item in resource_items_json must be a JSON object.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_resources(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             resource_list_payload=parsed_payload,
         )
 
@@ -1717,26 +1797,33 @@ def register_p6_tools(mcp: FastMCP) -> None:
     )
     def get_user_obs_from_p6(
         ctx: Context,
-        connection_id: int,
         fields: str,
         filter_condition: str,
         order_by: str,
     ) -> dict[str, Any]:
         """Read UserOBS from Oracle Primavera P6 using required Fields, Filter, and OrderBy query parameters."""
-        
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
+
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _get_p6_user_obs(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             fields=fields,
             filter_condition=filter_condition,
             order_by=order_by,
@@ -1745,13 +1832,20 @@ def register_p6_tools(mcp: FastMCP) -> None:
     @register_tracked_tool(
         mcp
     )
-    def create_user_obs_in_p6(ctx: Context,
-        connection_id: int, user_obs_items_json: str) -> dict[str, Any]:
+    def create_user_obs_in_p6(ctx: Context, user_obs_items_json: str) -> dict[str, Any]:
         """Create one or more UserOBS records in P6 using POST /userOBS.
 
         Pass a JSON array string of UserOBS objects as `user_obs_items_json`.
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(user_obs_items_json)
         except json.JSONDecodeError as exc:
@@ -1776,32 +1870,39 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "Each item in user_obs_items_json must be a JSON object.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_user_obs(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             user_obs_list_payload=parsed_payload,
         )
 
     @register_tracked_tool(
         mcp
     )
-    def create_projects_in_p6(ctx: Context,
-        connection_id: int, project_items_json: str) -> dict[str, Any]:
+    def create_projects_in_p6(ctx: Context, project_items_json: str) -> dict[str, Any]:
         """Create one or more Project records in P6 using POST /project.
 
         Pass a JSON array string of Project objects as `project_items_json`.
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(project_items_json)
         except json.JSONDecodeError as exc:
@@ -1826,32 +1927,39 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "Each item in project_items_json must be a JSON object.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_projects(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             project_list_payload=parsed_payload,
         )
 
     @register_tracked_tool(
         mcp
     )
-    def create_wbs_in_p6(ctx: Context,
-        connection_id: int, wbs_items_json: str) -> dict[str, Any]:
+    def create_wbs_in_p6(ctx: Context, wbs_items_json: str) -> dict[str, Any]:
         """Create one or more WBS records in P6 using POST /wbs.
 
         Pass a JSON array string of WBS objects as `wbs_items_json`.
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(wbs_items_json)
         except json.JSONDecodeError as exc:
@@ -1876,33 +1984,40 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "Each item in wbs_items_json must be a JSON object.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_wbs(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             wbs_list_payload=parsed_payload,
         )
 
     @register_tracked_tool(
         mcp
     )
-    def create_activities_in_p6(ctx: Context,
-        connection_id: int, activity_items_json: str) -> dict[str, Any]:
+    def create_activities_in_p6(ctx: Context, activity_items_json: str) -> dict[str, Any]:
         """Create one or more Activity records in P6 using POST /activity.
 
         Pass a JSON array string of Activity objects as `activity_items_json`.
         Each activity should include at least `ProjectObjectId` and `WBSObjectId`.
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(activity_items_json)
         except json.JSONDecodeError as exc:
@@ -1938,32 +2053,39 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "invalid_item_indexes": missing_required,
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_activities(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             activity_list_payload=parsed_payload,
         )
 
     @register_tracked_tool(
         mcp
     )
-    def create_resource_assignments_in_p6(ctx: Context,
-        connection_id: int, resource_assignment_items_json: str) -> dict[str, Any]:
+    def create_resource_assignments_in_p6(ctx: Context, resource_assignment_items_json: str) -> dict[str, Any]:
         """Create one or more ResourceAssignment records in P6 using POST /resourceAssignment.
 
         Pass a JSON array string of ResourceAssignment objects as `resource_assignment_items_json`.
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(resource_assignment_items_json)
         except json.JSONDecodeError as exc:
@@ -1988,32 +2110,39 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "Each item in resource_assignment_items_json must be a JSON object.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_resource_assignments(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             resource_assignment_list_payload=parsed_payload,
         )
 
     @register_tracked_tool(
         mcp
     )
-    def create_resource_curves_in_p6(ctx: Context,
-        connection_id: int, resource_curve_items_json: str) -> dict[str, Any]:
+    def create_resource_curves_in_p6(ctx: Context, resource_curve_items_json: str) -> dict[str, Any]:
         """Create one or more ResourceCurve records in P6 using POST /resourceCurve.
 
         Pass a JSON array string of ResourceCurve objects as `resource_curve_items_json`.
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(resource_curve_items_json)
         except json.JSONDecodeError as exc:
@@ -2038,32 +2167,39 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "Each item in resource_curve_items_json must be a JSON object.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_resource_curves(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             resource_curve_list_payload=parsed_payload,
         )
 
     @register_tracked_tool(
         mcp
     )
-    def create_risks_in_p6(ctx: Context,
-        connection_id: int, risk_items_json: str) -> dict[str, Any]:
+    def create_risks_in_p6(ctx: Context, risk_items_json: str) -> dict[str, Any]:
         """Create one or more Risk records in P6 using POST /risk.
 
         Pass a JSON array string of Risk objects as `risk_items_json`.
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(risk_items_json)
         except json.JSONDecodeError as exc:
@@ -2088,32 +2224,39 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "Each item in risk_items_json must be a JSON object.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_risks(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             risk_list_payload=parsed_payload,
         )
 
     @register_tracked_tool(
         mcp
     )
-    def create_activity_notes_in_p6(ctx: Context,
-        connection_id: int, activity_note_items_json: str) -> dict[str, Any]:
+    def create_activity_notes_in_p6(ctx: Context, activity_note_items_json: str) -> dict[str, Any]:
         """Create one or more ActivityNote records in P6 using POST /activityNote.
 
         Pass a JSON array string of ActivityNote objects as `activity_note_items_json`.
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(activity_note_items_json)
         except json.JSONDecodeError as exc:
@@ -2138,32 +2281,39 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "Each item in activity_note_items_json must be a JSON object.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_activity_notes(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             activity_note_list_payload=parsed_payload,
         )
 
     @register_tracked_tool(
         mcp
     )
-    def create_activity_steps_in_p6(ctx: Context,
-        connection_id: int, activity_step_items_json: str) -> dict[str, Any]:
+    def create_activity_steps_in_p6(ctx: Context, activity_step_items_json: str) -> dict[str, Any]:
         """Create one or more ActivityStep records in P6 using POST /activityStep.
 
         Pass a JSON array string of ActivityStep objects as `activity_step_items_json`.
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(activity_step_items_json)
         except json.JSONDecodeError as exc:
@@ -2188,32 +2338,39 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "Each item in activity_step_items_json must be a JSON object.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_activity_steps(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             activity_step_list_payload=parsed_payload,
         )
 
     @register_tracked_tool(
         mcp
     )
-    def create_calendars_in_p6(ctx: Context,
-        connection_id: int, calendar_items_json: str) -> dict[str, Any]:
+    def create_calendars_in_p6(ctx: Context, calendar_items_json: str) -> dict[str, Any]:
         """Create one or more Calendar records in P6 using POST /calendar.
 
         Pass a JSON array string of Calendar objects as `calendar_items_json`.
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(calendar_items_json)
         except json.JSONDecodeError as exc:
@@ -2238,19 +2395,19 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "Each item in calendar_items_json must be a JSON object.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_calendars(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             calendar_list_payload=parsed_payload,
         )
 
@@ -2259,26 +2416,33 @@ def register_p6_tools(mcp: FastMCP) -> None:
     )
     def get_calendars_from_p6(
         ctx: Context,
-        connection_id: int,
         fields: str,
         filter_condition: str,
         order_by: str,
     ) -> dict[str, Any]:
         """Read calendars from Oracle Primavera P6 using required Fields, Filter, and OrderBy query parameters."""
-        
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
+
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _get_p6_calendars(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             fields=fields,
             filter_condition=filter_condition,
             order_by=order_by,
@@ -2287,13 +2451,20 @@ def register_p6_tools(mcp: FastMCP) -> None:
     @register_tracked_tool(
         mcp
     )
-    def create_currencies_in_p6(ctx: Context,
-        connection_id: int, currency_items_json: str) -> dict[str, Any]:
+    def create_currencies_in_p6(ctx: Context, currency_items_json: str) -> dict[str, Any]:
         """Create one or more Currency records in P6 using POST /currency.
 
         Pass a JSON array string of Currency objects as `currency_items_json`.
         """
-        
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
+
         try:
             parsed_payload = json.loads(currency_items_json)
         except json.JSONDecodeError as exc:
@@ -2318,19 +2489,19 @@ def register_p6_tools(mcp: FastMCP) -> None:
                 "error": "Each item in currency_items_json must be a JSON object.",
             }
 
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _create_p6_currencies(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             currency_list_payload=parsed_payload,
         )
 
@@ -2339,26 +2510,33 @@ def register_p6_tools(mcp: FastMCP) -> None:
     )
     def get_currencies_from_p6(
         ctx: Context,
-        connection_id: int,
         fields: str,
         filter_condition: str,
         order_by: str,
     ) -> dict[str, Any]:
         """Read currencies from Oracle Primavera P6 using required Fields, Filter, and OrderBy query parameters."""
-        
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
+
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _get_p6_currencies(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             fields=fields,
             filter_condition=filter_condition,
             order_by=order_by,
@@ -2369,26 +2547,33 @@ def register_p6_tools(mcp: FastMCP) -> None:
     )
     def get_cbss_from_p6(
         ctx: Context,
-        connection_id: int,
         fields: str,
         filter_condition: str,
         order_by: str,
     ) -> dict[str, Any]:
         """Read CBS objects from Oracle Primavera P6 using required Fields, Filter, and OrderBy query parameters."""
-        
-        result = get_p6_connection_session(ctx, connection_id)
-        if not result["success"]:
-            return result
+        creds, missing = _resolve_credentials(ctx)
+        if missing:
+            return {
+                "success": False,
+                "requires_credentials": True,
+                "missing": missing,
+                "error": "P6 credentials are missing. Provide them via set_p6_credentials(...) or environment variables.",
+            }
 
-        session = result["session"]
-        auth_token = session["auth_token"]
-        cookies = session["cookies"]
-        base_url = session["base_url"]
+        auth_token = _generate_auth_token(creds["username"], creds["password"])
+        cookies = _login_auth(auth_token, creds["base_url"], creds["database_name"])
+
+        if not cookies:
+            return {
+                "success": False,
+                "error": "P6 login failed.",
+            }
 
         return _get_p6_cbss(
             auth_token=auth_token,
             cookies=cookies,
-            base_url=base_url,
+            base_url=creds["base_url"],
             fields=fields,
             filter_condition=filter_condition,
             order_by=order_by,
